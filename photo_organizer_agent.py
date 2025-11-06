@@ -70,11 +70,26 @@ def classify_image(image_path: str) -> str:
 
     messages = [
         SystemMessage("""
-            You are a photo classification assistant.
-            Rules:
-            - Respond ONLY with one short lowercase category (e.g. travel, family_party, pet, food... etc)
-            - Reuse existing categories if they clearly fit.
-            - Do NOT explain. Do NOT include punctuation or lists. Just output the single category name.
+            You are a precise photo classification assistant.
+            
+            Analyze the image carefully and classify it into ONE specific category.
+            
+            Common categories:
+            - travel (landmarks, tourist locations, outdoor adventures)
+            - food (meals, cooking, restaurants)
+            - family (family gatherings, relatives)
+            - pet (dogs, cats, animals)
+            - work (office, meetings, professional events)
+            - nature (landscapes, plants, wildlife)
+            - sports (athletic activities, games)
+            - event (parties, celebrations, weddings)
+            - selfie (portrait, personal photos)
+            - document (screenshots, receipts, text)
+            
+            CRITICAL RULES:
+            - Output ONLY the category name in lowercase
+            - NO explanations, NO punctuation, NO extra words
+            - Be SPECIFIC - don't default to 'travel' for everything
         """),
         HumanMessage(content=[
             {"type": "image_url", "image_url": {"url": base64_image}},
@@ -94,39 +109,39 @@ def create_directory(dir_path: str) -> str:
     return f"Directory ready: {path}"
 
 
-
-# System prompt for the agent
+@tool
+def get_filename(path: str) -> str:
+    """Return just the filename from a full path."""
+    return os.path.basename(path)
+    
 agent_system_prompt = """
-    You are a smart image organizer agent.
-    Goal: Move all the images from {input_dir} into subfolders of {output_base}, grouped by their content category
+You are an image organization agent. Organize ALL images from source to destination by category.
 
-    How to do it:
-    1. Call list_images({input_dir}) to get the full list of image paths
-    2. For each image path make an appropriate tool call:
-        I can see that u are mentioning moving images but use tools to do that. if u are not able to use tools then mention that.
-        a. call classify_image(image_path) to get the image category
-        b. compute category_folder = {output_base}/category 
-        c. call create_directory(category_folder) to ensure it exists
-        d. call move_file with input_path=image_path, output_path=category_folder/image_name (keep the file name same as the original)
-    3. Repeat until ALL images are moved. use list_directory({input_dir}) to check if empty (ignore non-images)
-    4. Keep tracking the progress and mention how many are left at each stage
-    5. When there are no more images left in {input_dir}. Then respond "All images are organized successfully"
-    Make tool calls until the goal is achieved
+ CRITICAL RULES:
+1. ONLY output tool calls - NO text, NO explanations, NO "..." 
+2. After EVERY move_file, immediately call list_images to check for more images
+3. Continue until list_images returns []
+4. ONLY when list_images returns [], output: "All images are organized successfully"
 
-    Be precise with the paths. DO NOT STOP until the Goal of organizing images is achieved.
-""".format(input_dir=INPUT_DIR, output_base=OUTPUT_DIR)
+MANDATORY WORKFLOW - FOLLOW EXACTLY:
+1. list_images(source_dir)
+2. If images found:
+   - classify_image(first_image_path)
+   - create_directory(dest_dir/category)
+   - move_file(source, destination)
+   - IMMEDIATELY call list_images(source_dir) again
+   - REPEAT from step 2
+3. If list_images returns []: output "All images are organized successfully"
 
-# prompt = ChatPromptTemplate.from_messages([
-#     ('system', agent_system_prompt),
-#     MessagesPlaceholder(variable_name="chat_history", optional=True),
-#     ("human", "{input}"),
-#     MessagesPlaceholder(variable_name="agent_scratchpad")
-# ])
+PATH FORMATS:
+- Source: photos/{filename}
+- Destination: organized/{category}/{filename}
 
-# prompt = prompt.partial(
-#     input_dir=INPUT_DIR,
-#     output_base=OUTPUT_DIR
-# )
+ NEVER output text like "...", NEVER stop until list_images returns []
+ ALWAYS call list_images after EVERY move_file operation
+
+START NOW: Call list_images on the source directory.
+"""
 
 tools = file_tools + [list_images, classify_image, create_directory]
 
@@ -134,80 +149,22 @@ agent = create_agent(
     model=llm_agent,
     tools=tools,
     system_prompt=agent_system_prompt,
-    debug=True
+    debug=True,
 )
 
-langchain.debug = True
-
-
 result = agent.invoke({
-    "messages": [{"role": "user", "content": "Start organizing ALL images now. List them first."}]
-})
+    "messages": [{"role": "user", "content": "Start organizing ALL images now. organize from ./photos to ./organized"}]
+}, 
+config={"recursion_limit": 150})
 
-# print(result)
 
-# result = agent.invoke({
-#     "messages": [{"role": "user", "content": "Start organizing ALL images now. List them first."}]
-# })
+while True:
+    user_input = input("Enter source folder (for images) ").strip()
+    if user_input.lower() == "exit":
+        break
+    output_dir = input("Enter destination folder (for organized images): ").strip()
+    if output_dir.lower() == "exit":
+        break
 
-# print(result)
 
-# known_categories = {}
-
-# for filename in os.listdir(IMAGE_FOLDER):
-#     if not filename.lower().endswith(('.jpg', '.jpeg', '.png')):
-#         continue
-#     # print("file name: ", filename)
-#     image_path = os.path.join(IMAGE_FOLDER, filename)
-#     base64_image = encode_images_to_base64(image_path)
-#     # print("encode image")
-
-#     if known_categories:
-#         known_text = "\n".join([f"{k}: {v}" for k, v in known_categories.items()])
-#         context_text = f"Here are the categories assigned so far:\n{known_text}\n"
-#     else:
-#         context_text = "No categories assigned yet. \n"
     
-#     print(context_text)
-
-#     messages = [
-#         SystemMessage("""
-#             You are a photo classification assistant.
-#             Rules:
-#             - Respond ONLY with one short lowercase category (e.g. travel, family_party, pet, food... etc)
-#             - Reuse existing categories if they clearly fit.
-#             - Do NOT explain. Do NOT include punctuation or lists. Just output the single category name.
-#     """),
-#     HumanMessage(content=[
-#             {"type": "text", "text": context_text + " Classify the next image:"},
-#             {"type": "image_url", "image_url": {"url": base64_image}},
-#         ])
-#     ]
-
-#     ai_response = llm_vision.invoke(messages)
-#     image_category = ai_response.content.strip()
-
-#     print("Category detected: ", image_category)
-    
-#     known_categories[filename] = image_category
-
-
-
-
-# print(known_categories)
-
-
-
-
-# print(os.listdir(IMAGE_FOLDER))
-
-
-## loop through the images and then for each image pass that image to the LLM and get a single category back
-
-## After this use that category to create a folder using langchain and move that image inside that folder.
-
-# ai_response = llama_model.invoke(messages)
-# image_category = ai_response.content
-# messages.append(
-#     AIMessage(image_category)
-# )
