@@ -152,19 +152,40 @@ agent = create_agent(
     debug=True,
 )
 
-result = agent.invoke({
-    "messages": [{"role": "user", "content": "Start organizing ALL images now. organize from ./photos to ./organized"}]
-}, 
-config={"recursion_limit": 150})
+# result = agent.invoke({
+#     "messages": [{"role": "user", "content": "Start organizing ALL images now. organize from ./photos to ./organized"}]
+# }, 
+# config={"recursion_limit": 150})
 
 
-while True:
-    user_input = input("Enter source folder (for images) ").strip()
-    if user_input.lower() == "exit":
-        break
-    output_dir = input("Enter destination folder (for organized images): ").strip()
-    if output_dir.lower() == "exit":
-        break
+def organize_images() :
+    while True:
+        user_input = input("Enter source folder (for images) ").strip()
+        if user_input.lower() == "exit":
+            break
+        output_dir = input("Enter destination folder (for organized images): ").strip()
+        if output_dir.lower() == "exit":
+            break
+        
+        while True:
+            user_command = input("Type ORGANIZE or 'back' to change folders: ").strip()
+            if user_command.lower() == "exit":
+                return
+            if user_command.lower() == "back":
+                break
+            
+            if user_command.lower() != "organize":
+                print("Invalid command. Please type 'ORGANIZE', 'back' or 'exit'. ")
+                continue
+
+            result = agent.invoke({
+                    "messages": [{"role": "user", "content": "Start organizing ALL images now. organize from ./photos to ./organized"}]},
+                    config={"recursion_limit": 150}
+            )
+
+            print(result)
+            break
 
 
-    
+if __name__ == "__main__":
+    organize_images()
