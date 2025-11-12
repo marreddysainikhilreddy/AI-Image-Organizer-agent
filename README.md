@@ -6,7 +6,7 @@
 [![LangChain](https://img.shields.io/badge/LangChain-Latest-green.svg)](https://www.langchain.com/)
 [![Ollama](https://img.shields.io/badge/Ollama-LLaMA3.2-orange.svg)](https://ollama.ai/)
 
-## 🎯 Problem It Solves
+## 🎯 Description
 
 Managing large photo collections is time-consuming and tedious. Whether you're a:
 - **Content Creator** drowning in thousands of unsorted media files
