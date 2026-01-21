@@ -1,40 +1,43 @@
 import os
-from langchain_community.agent_toolkits import FileManagementToolkit
-from langchain_ollama import ChatOllama
-from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
-from langchain.agents import create_agent
-from typing import List
-
-from pathlib import Path
-import langchain
-
-from langchain.tools import tool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from PIL import Image
 import base64
+from typing import List
+from pathlib import Path
+from PIL import Image
 from io import BytesIO
 
-
-current_directory = os.path.dirname(os.path.abspath(__file__))
-IMAGE_FOLDER = os.path.join(current_directory, "photos")
-
-INPUT_DIR = "./photos"
-OUTPUT_DIR = "./organized"
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_community.agent_toolkits import FileManagementToolkit
+from langchain_ollama import ChatOllama
+from langchain.agents import create_agent
+from langchain.tools import tool
+# from langchain.agents import 
+from typing import List
 
 
 file_toolkit = FileManagementToolkit(
     root_dir='.',
-    # selected_tools=["list_directory", "move_file"]
 )
 file_tools = file_toolkit.get_tools()
-# print(file_tools)
 
 # For classification
 llm_vision = ChatOllama(model="llama3.2-vision", temperature=0.2)
+# llm_vision = ChatOllama(model="gpt-oss:20b", temperature=0.2)
+# llm_vision = ChatGoogleGenerativeAI(
+#     model="gemini-2.5-flash", 
+#     temperature=0.2,
+#     google_api_key=""
+# )
 
 # For agent
 # llm_agent = ChatOllama(model="llama3.2", temperature=0.2)
-llm_agent = ChatOllama(model="llama3-groq-tool-use", temperature=0.2)
+# llm_agent = ChatOllama(model="llama3-groq-tool-use", temperature=0.2)
+llm_agent = ChatOllama(model="gpt-oss:20b", temperature=0.2)
+# llm_agent = ChatGoogleGenerativeAI(
+#     model="gemini-2.5-flash", 
+#     temperature=0.2,
+#     google_api_key=""
+# )
+
 
 
 def encode_images_to_base64(image_path: str) -> str:
@@ -114,34 +117,27 @@ def get_filename(path: str) -> str:
     """Return just the filename from a full path."""
     return os.path.basename(path)
     
+
 agent_system_prompt = """
-You are an image organization agent. Organize ALL images from source to destination by category.
+You are an image organizer. Move every image from source path to destination path.
+Goal: organize the images from source path to the destination path in their respective category folders
 
- CRITICAL RULES:
-1. ONLY output tool calls - NO text, NO explanations, NO "..." 
-2. After EVERY move_file, immediately call list_images to check for more images
-3. Continue until list_images returns []
-4. ONLY when list_images returns [], output: "All images are organized successfully"
+RULES:
+    - NEVER output any text, explanation, or placeholder.
+    - ONLY respond with tool calls.
+    - When list_images returns [], respond EXACTLY: "All images are organized successfully"
 
-MANDATORY WORKFLOW - FOLLOW EXACTLY:
-1. list_images(source_dir)
-2. If images found:
-   - classify_image(first_image_path)
-   - create_directory(dest_dir/category)
-   - move_file(source, destination)
-   - IMMEDIATELY call list_images(source_dir) again
-   - REPEAT from step 2
-3. If list_images returns []: output "All images are organized successfully"
 
-PATH FORMATS:
-- Source: photos/{filename}
-- Destination: organized/{category}/{filename}
+INSTRUCTIONS
+    - Use list_images tool to get the list of all images file names in a directory
+    - Use classify_image to get the category of an image 
+    - Use create_directory to create a folder/directory
+    - Use get_filename to get the file name
+    - use move_file to move the file from a source path to destination path
+    - use any other tools provided to you to achieve the goal
 
- NEVER output text like "...", NEVER stop until list_images returns []
- ALWAYS call list_images after EVERY move_file operation
-
-START NOW: Call list_images on the source directory.
 """
+
 
 tools = file_tools + [list_images, classify_image, create_directory]
 
@@ -152,34 +148,31 @@ agent = create_agent(
     debug=True,
 )
 
-# result = agent.invoke({
-#     "messages": [{"role": "user", "content": "Start organizing ALL images now. organize from ./photos to ./organized"}]
-# }, 
-# config={"recursion_limit": 150})
-
 
 def organize_images() :
     while True:
-        user_input = input("Enter source folder (for images) ").strip()
-        if user_input.lower() == "exit":
+        user_input_dir = input("Enter source folder (for your images) ").strip()
+        if user_input_dir.lower() == "exit":
             break
         output_dir = input("Enter destination folder (for organized images): ").strip()
         if output_dir.lower() == "exit":
             break
         
         while True:
-            user_command = input("Type ORGANIZE or 'back' to change folders: ").strip()
-            if user_command.lower() == "exit":
+            user_command = input("I'm an AI agent over here. What task would you like me to perform?  Type 'organize' to start, 'back' to change folders, or 'exit': ").strip()
+            if "exit" in user_command.lower():
                 return
-            if user_command.lower() == "back":
+            if "back" in user_command.lower():
                 break
             
-            if user_command.lower() != "organize":
+            # print(user_command.lower())
+
+            if "organize" not in user_command.lower() and "organizing" not in user_command.lower():
                 print("Invalid command. Please type 'ORGANIZE', 'back' or 'exit'. ")
                 continue
 
             result = agent.invoke({
-                    "messages": [{"role": "user", "content": "Start organizing ALL images now. organize from ./photos to ./organized"}]},
+                    "messages": [{"role": "user", "content": f"Start organizing ALL images now. organize from {user_input_dir} to {output_dir}"}]},
                     config={"recursion_limit": 150}
             )
 
