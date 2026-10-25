@@ -1,5 +1,9 @@
 # 🖼️ AI-Powered Image Organizer
 
+<p align="center">
+  <img src="docs/images/project-cover.jpg" alt="Local Vision Agent — autonomous ai" width="720" />
+</p>
+
 > Automatically classify and organize thousands of photos using local LLM vision models and intelligent agents
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
